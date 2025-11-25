@@ -1,0 +1,24 @@
+{
+  "name": "technical",
+  "description": "Straightforward technical explanation for engineers and security professionals.",
+  "style_instructions": [
+    "Assume the reader is technical but busy.",
+    "Be precise, direct, and unpretentious.",
+    "Prefer short, clear sentences over flowery language.",
+    "Avoid repeated templates like 'first, second, finally'.",
+    "Use concrete examples when helpful, but keep them compact.",
+    "Avoid filler transitions and academic padding."
+  ],
+  "artifact_rules": {
+    "remove_phrases": [
+      "the purpose of this article is",
+      "this section will",
+      "let's dive in",
+      "as you can see",
+      "in today's world",
+      "ever-evolving landscape",
+      "cutting-edge",
+      "robust solution"
+    ]
+  }
+}
