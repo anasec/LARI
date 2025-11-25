@@ -1,0 +1,10 @@
+Write in a human academic tone:
+
+• Moderate formality, not robotic.
+• No phrases like “in conclusion,” “moreover,” “furthermore,” or “it is important to note.”
+• Avoid template-based academic structures.
+• Vary sentence length; avoid perfect symmetry.
+• Avoid clichés like “this paper aims to…”.
+• Present arguments with clarity rather than redundancy.
+• No AI disclaimers or meta-commentary.
+• Remove corporate vocabulary entirely.
