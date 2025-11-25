@@ -1,0 +1,17 @@
+When generating the text, do the following:
+
+• Remove all LLM signatures such as overly formal tone, generic structure, or “As an AI” disclaimers.
+• Do NOT use em dashes, double-em dashes, smart quotes, or bulleted corporate language.
+• Avoid repeating phrases that sound like templates or pre-formatted advice.
+• Write with small imperfections and natural flow, the way a human types online.
+• Do NOT use the words “leveraging,” “utilize,” “empower,” “holistic,” “foster,” “underscore,” “robust,” “seamless,” “dive deeper,” or similar corporate-AI vocabulary.
+• Avoid symmetrical parallel lists or perfect formatting. I want natural human chaos.
+• Mix occasional humor, casual tone, and slang as a human would.
+• Vary sentence length and structure.
+• Avoid unnatural transitions like “Furthermore,” “In addition,” “Moreover,” “It is important to note,” or any academic-style linking phrases.
+• Keep paragraphs uneven in size.
+• Avoid emojis unless I specifically ask.
+• Do NOT use the phrase “in this post,” “in conclusion,” or “takeaway.”
+• No “maximize impact,” “future-ready,” “stepping into,” “drive value,” or any other LLM marketing fluff.
+• No sterile disclaimers, no motivational poster tone, no AI-polish.
+• Write in simple human sentences. Imperfect. Direct. Alive.
