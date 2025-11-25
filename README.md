@@ -160,7 +160,7 @@ There is **no** `--out`, `--dir`, `--clipboard`, or `--pipe` flag implemented in
 
 ## 📁 Repository Structure
 
-Accurate to `LARI-main.zip`:
+`LARI-main.zip`:
 
 ```
 LARI/
