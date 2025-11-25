@@ -156,46 +156,6 @@ def run(
 
 There is **no** `--out`, `--dir`, `--clipboard`, or `--pipe` flag implemented in `lari.py`.
 
----
-
-## 📁 Repository Structure
-
-`LARI-main.zip`:
-
-```
-LARI/
-│
-├── .gitignore
-├── CONTRIBUTING.md
-├── README.md
-├── requirements.txt
-├── lari.py
-│
-├── config/
-│   ├── README.md
-│   ├── config.example.json
-│   ├── config.json          ← used at runtime by lari.py
-│   └── profiles/
-│       ├── academic.json
-│       ├── casual.json
-│       ├── linkedin.json
-│       ├── technical.json
-│       └── (your custom profiles).json
-│
-├── prompt-packs/
-│   ├── HUMANMODE_Academic.txt
-│   ├── HUMANMODE_Casual.txt
-│   ├── HUMANMODE_LinkedIn.txt
-│   ├── HUMANMODE_Master.txt
-│   ├── HUMANMODE_Technical.txt
-│   └── README.md
-│
-└── prompts/
-    ├── academic.md
-    ├── casual.md
-    ├── linkedin.md
-    └── technical.md
-```
 
 Notes:
 
