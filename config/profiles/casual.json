@@ -1,0 +1,21 @@
+{
+  "name": "casual",
+  "description": "Relaxed, conversational tone for informal posts, comments, or chats.",
+  "style_instructions": [
+    "Write like a real person talking to a friend or colleague.",
+    "Use contractions and natural phrasing.",
+    "Do not over-explain simple ideas.",
+    "Allow slang when it fits, but don't force it.",
+    "Avoid generic 'internet advice' tone.",
+    "Keep things direct, a bit messy, and human."
+  ],
+  "artifact_rules": {
+    "remove_phrases": [
+      "at the end of the day",
+      "on the other hand",
+      "in other words",
+      "that being said",
+      "needless to say"
+    ]
+  }
+}
