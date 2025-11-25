@@ -22,7 +22,7 @@ LARI is designed for **clarity** and **authenticity**, not impersonation or bypa
 
 ---
 
-## 🚀 Features (accurate to `lari.py`)
+## 🚀 Features
 
 ### ✔ HumanMode Profiles
 
