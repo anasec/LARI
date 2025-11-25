@@ -5,10 +5,8 @@
   "default_profile": "linkedin",
   "temperature": 0.6,
   "max_tokens": 1500,
-
   "openai_api_key_env": "OPENAI_API_KEY",
   "anthropic_api_key_env": "ANTHROPIC_API_KEY",
-
   "ollama": {
     "base_url": "http://localhost:11434",
     "model": "llama3"
