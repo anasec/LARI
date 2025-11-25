@@ -1,255 +1,181 @@
 #!/usr/bin/env python3
 import json
-import os
-import sys
-from pathlib import Path
-from typing import Optional, Dict, Any, List
-
 import typer
+from rich import print
 from rich.console import Console
-from rich.prompt import Confirm
-from rich.progress import Progress
-from openai import OpenAI
+import requests
+import os
 
-app = typer.Typer(help="LARI — LLM Artifact Removal Initiative CLI")
+app = typer.Typer(help="LARI — LLM Artifact Removal Initiative")
+
 console = Console()
 
-# -------------------- config loading -------------------- #
+# ---------------------------------------------------------
+# Load config
+# ---------------------------------------------------------
 
-def load_config() -> Dict[str, Any]:
-    config_path = Path("config/config.json")
-    if not config_path.exists():
-        console.print("[yellow]config/config.json not found. Using config/config.example.json[/yellow]")
-        config_path = Path("config/config.example.json")
-        if not config_path.exists():
-            console.print("[red]No config file found. Create config/config.json or config/config.example.json[/red]")
-            raise typer.Exit(1)
-    with config_path.open("r", encoding="utf-8") as f:
+def load_config():
+    with open("config/config.json", "r", encoding="utf-8") as f:
         return json.load(f)
 
+# ---------------------------------------------------------
+# Load profile
+# ---------------------------------------------------------
 
-def load_profile(config: Dict[str, Any], profile_name: str) -> Dict[str, Any]:
-    profiles_path = Path(config.get("profiles_path", "./config/profiles"))
-    profile_path = profiles_path / f"{profile_name}.json"
-    if not profile_path.exists():
-        console.print(f"[red]Profile not found:[/red] {profile_path}")
-        raise typer.Exit(1)
-    with profile_path.open("r", encoding="utf-8") as f:
+def load_profile(profile_name, config):
+    profile_path = os.path.join(config["profiles_path"], f"{profile_name}.json")
+    if not os.path.exists(profile_path):
+        console.print(f"[red]Profile not found:[/red] {profile_name}")
+        raise typer.Exit()
+    with open(profile_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
+# ---------------------------------------------------------
+# Engine: OpenAI
+# ---------------------------------------------------------
 
-def load_prompt(profile_name: str) -> str:
-    prompts_path = Path("prompts")
-    prompt_file = prompts_path / f"{profile_name}.md"
-    if not prompt_file.exists():
-        return (
-            "You are LARI, rewriting AI-generated text so it reads like it was written by a real human. "
-            "Preserve meaning, remove obvious AI artifacts, and keep the tone natural and slightly imperfect. "
-            "Return only the rewritten text."
-        )
-    return prompt_file.read_text(encoding="utf-8")
+def rewrite_with_openai(text, profile, config):
+    import openai
 
-
-# -------------------- artifact scrubbing -------------------- #
-
-DEFAULT_ARTIFACT_PHRASES = [
-    "as an ai language model",
-    "as an ai",
-    "in conclusion",
-    "in summary",
-    "furthermore",
-    "moreover",
-    "additionally",
-    "in today's world",
-    "ever-evolving landscape"
-]
-
-
-def scrub_artifacts(text: str, profile: Dict[str, Any]) -> str:
-    """Simple rule-based scrubber that removes or softens obvious LLM artifacts and punctuation patterns."""
-    import re
-
-    phrases: List[str] = DEFAULT_ARTIFACT_PHRASES.copy()
-    extra = profile.get("artifact_rules", {}).get("remove_phrases", [])
-    phrases.extend(extra)
-
-    cleaned = text
-
-    # Remove phrases
-    for phrase in phrases:
-        cleaned = re.sub(re.escape(phrase), "", cleaned, flags=re.IGNORECASE)
-
-    # Normalize dash types
-    cleaned = cleaned.replace("—", "-")  # em dash
-    cleaned = cleaned.replace("–", "-")  # en dash
-    cleaned = re.sub(r"-{2,}", "-", cleaned)  # collapse multiple dashes
-
-    # Remove bullet-like characters
-    cleaned = cleaned.replace("•", "")
-
-    # Remove weird unicode spacings
-    cleaned = cleaned.replace("\u2009", " ")
-    cleaned = cleaned.replace("\u202F", " ")
-    cleaned = cleaned.replace("\u00A0", " ")
-
-    # Remove corporate-style list bullets at line starts
-    cleaned = re.sub(r"^\s*[-*]\s+", "", cleaned, flags=re.MULTILINE)
-
-    # Collapse excessive whitespace
-    cleaned = re.sub(r"\s{3,}", "  ", cleaned)
-    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
-
-    return cleaned.strip()
-
-
-# -------------------- LLM call -------------------- #
-
-def get_openai_client(config: Dict[str, Any]) -> OpenAI:
-    env_var = config.get("openai_api_key_env", "OPENAI_API_KEY")
-    api_key = os.getenv(env_var)
+    api_key = os.getenv(config["openai_api_key_env"])
     if not api_key:
-        console.print(f"[red]Environment variable {env_var} is not set.[/red]")
-        console.print("Export your key, e.g.:")
-        console.print(f"[cyan]export {env_var}=your_api_key_here[/cyan]")
-        raise typer.Exit(1)
-    return OpenAI(api_key=api_key)
+        console.print("[red]Missing OPENAI_API_KEY environment variable.[/red]")
+        raise typer.Exit()
+
+    client = openai.OpenAI(api_key=api_key)
+
+    response = client.chat.completions.create(
+        model=config["default_model"],
+        temperature=config["temperature"],
+        max_tokens=config["max_tokens"],
+        messages=[
+            {"role": "system", "content": profile["system"]},
+            {"role": "user", "content": profile["user"] + "\n\n" + text},
+        ],
+    )
+
+    return response.choices[0].message.content.strip()
 
 
-def rewrite_with_llm(
-    config: Dict[str, Any],
-    profile: Dict[str, Any],
-    system_prompt: str,
-    text: str,
-) -> str:
-    client = get_openai_client(config)
-    model = config.get("default_model", "gpt-4.1-mini")
-    temperature = float(config.get("temperature", 0.6))
-    max_tokens = int(config.get("max_tokens", 1500))
+# ---------------------------------------------------------
+# Engine: Anthropic
+# ---------------------------------------------------------
 
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {
-            "role": "user",
-            "content": (
-                "Profile description:\n"
-                f"{profile.get('description', '')}\n\n"
-                "Style instructions (apply these, but keep the content accurate):\n"
-                + "\n".join(f"- {s}" for s in profile.get("style_instructions", []))
-                + "\n\n"
-                "Text to rewrite:\n"
-                f"{text}"
-            ),
-        },
-    ]
+def rewrite_with_anthropic(text, profile, config):
+    import anthropic
 
-    with Progress() as progress:
-        task = progress.add_task("[green]Calling LLM...", total=None)
-        resp = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
+    api_key = os.getenv(config["anthropic_api_key_env"])
+    if not api_key:
+        console.print("[red]Missing ANTHROPIC_API_KEY environment variable.[/red]")
+        raise typer.Exit()
+
+    client = anthropic.Anthropic(api_key=api_key)
+
+    response = client.messages.create(
+        model="claude-3-sonnet-20240229",
+        max_tokens=config["max_tokens"],
+        temperature=config["temperature"],
+        system=profile["system"],
+        messages=[{"role": "user", "content": profile["user"] + "\n\n" + text}],
+    )
+
+    return response.content[0].text.strip()
+
+
+# ---------------------------------------------------------
+# Engine: Ollama (offline)
+# ---------------------------------------------------------
+
+def rewrite_with_ollama(text, profile, config):
+    url = f'{config["ollama"]["base_url"]}/api/generate'
+    model = config["ollama"]["model"]
+
+    payload = {
+        "model": model,
+        "prompt": profile["system"] + "\n\n" + profile["user"] + "\n\n" + text,
+        "temperature": config["temperature"]
+    }
+
+    resp = requests.post(url, json=payload)
+    if resp.status_code != 200:
+        console.print(f"[red]Ollama request failed:[/red] {resp.text}")
+        raise typer.Exit()
+
+    return resp.json().get("response", "").strip()
+
+
+# ---------------------------------------------------------
+# Main rewrite function
+# ---------------------------------------------------------
+
+def rewrite(text, engine, profile, config, dry_run=False):
+
+    # Dry run mode — regex style cleaning
+    if dry_run:
+        cleaned = (
+            text.replace("—", "-")
+            .replace("–", "-")
+            .replace("in conclusion", "")
+            .replace("as an AI", "")
+            .replace("leveraging", "using")
+            .replace("dive deeper", "look into")
+            .replace("furthermore", "")
         )
-        progress.update(task, completed=1)
+        return cleaned.strip()
 
-    content = resp.choices[0].message.content
-    return content.strip()
+    # Normal engine mode
+    if engine == "openai":
+        return rewrite_with_openai(text, profile, config)
 
+    elif engine == "anthropic":
+        return rewrite_with_anthropic(text, profile, config)
 
-# -------------------- IO helpers -------------------- #
+    elif engine == "ollama":
+        return rewrite_with_ollama(text, profile, config)
 
-def read_input_text(input_path: Optional[Path]) -> str:
-    if input_path is None or str(input_path) == "-":
-        console.print("[cyan]Reading from stdin. Press Ctrl+D (Linux/macOS) or Ctrl+Z then Enter (Windows) when done.[/cyan]")
-        return sys.stdin.read()
-    if not input_path.exists():
-        console.print(f"[red]Input file not found:[/red] {input_path}")
-        raise typer.Exit(1)
-    return input_path.read_text(encoding="utf-8")
-
-
-def write_output_text(output_path: Optional[Path], text: str) -> None:
-    if output_path is None:
-        console.print("\n[bold green]--- Rewritten Text ---[/bold green]\n")
-        console.print(text)
     else:
-        output_path.write_text(text, encoding="utf-8")
-        console.print(f"[green]Written output to:[/green] {output_path}")
+        console.print(f"[red]Unknown engine:[/red] {engine}")
+        raise typer.Exit()
 
 
-# -------------------- CLI command -------------------- #
+# ---------------------------------------------------------
+# CLI Command
+# ---------------------------------------------------------
 
 @app.command()
-def rewrite(
-    input: Optional[Path] = typer.Argument(
-        None,
-        help="Input file path. Use '-' or omit to read from stdin."
-    ),
-    profile: str = typer.Option(
-        None,
-        help="Profile name (e.g. linkedin, technical, academic, casual). Defaults to config.default_profile."
-    ),
-    model: Optional[str] = typer.Option(
-        None,
-        help="Override model (defaults to config.default_model)."
-    ),
-    out: Optional[Path] = typer.Option(
-        None,
-        "--out",
-        "-o",
-        help="Optional output file path. If not set, prints to stdout."
-    ),
-    dry_run: bool = typer.Option(
-        False,
-        "--dry-run",
-        help="Only run local artifact scrubbing, skip LLM call."
-    ),
+def run(
+    text: str = typer.Argument(None, help="Text to rewrite. Leave blank to read from STDIN."),
+    profile: str = typer.Option("linkedin", help="Profile to use."),
+    engine: str = typer.Option(None, help="Engine: openai | anthropic | ollama | dry-run"),
+    file: str = typer.Option(None, help="Input file path"),
 ):
     """
-    Rewrite text using LARI to remove LLM artifacts and apply a HumanMode profile.
+    LARI rewrite engine.
     """
+
     config = load_config()
-    profile_name = profile or config.get("default_profile", "linkedin")
-    prof = load_profile(config, profile_name)
-    base_prompt = load_prompt(profile_name)
+    engine = engine or config["default_engine"]
+    profile_data = load_profile(profile, config)
 
-    if model is not None:
-        config["default_model"] = model
+    # Load input
+    if file:
+        with open(file, "r", encoding="utf-8") as f:
+            text_input = f.read()
+    elif text is None:
+        text_input = typer.get_text_stream("stdin").read()
+    else:
+        text_input = text
 
-    raw_text = read_input_text(input)
-    if not raw_text.strip():
-        console.print("[red]No input text provided.[/red]")
-        raise typer.Exit(1)
+    result = rewrite(
+        text_input,
+        engine,
+        profile_data,
+        config,
+        dry_run=(engine == "dry-run"),
+    )
 
-    # Step 1: local scrub
-    scrubbed = scrub_artifacts(raw_text, prof)
-
-    # If dry-run: stop here
-    if dry_run:
-        write_output_text(out, scrubbed)
-        raise typer.Exit(0)
-
-    # Confirm if text is large
-    if len(scrubbed) > 8000:
-        ok = Confirm.ask(
-            "[yellow]Text is long (>8000 chars). Continue and send to LLM?[/yellow]",
-            default=False
-        )
-        if not ok:
-            console.print("[red]Aborted by user.[/red]")
-            raise typer.Exit(1)
-
-    # Step 2: LLM rewrite
-    rewritten = rewrite_with_llm(config, prof, base_prompt, scrubbed)
-    write_output_text(out, rewritten)
-
-
-@app.callback()
-def main_callback():
-    """
-    LARI — LLM Artifact Removal Initiative
-    """
-    pass
+    print("\n[bold green]=== LARI OUTPUT ===[/bold green]\n")
+    print(result)
 
 
 if __name__ == "__main__":
