@@ -1,0 +1,24 @@
+{
+  "name": "academic",
+  "description": "Structured, formal writing appropriate for academic or research-adjacent contexts without generic LLM padding.",
+  "style_instructions": [
+    "Use formal but not pretentious language.",
+    "Avoid generic academic boilerplate and overused transitions.",
+    "Keep paragraphs focused and not overly long.",
+    "Present arguments clearly and support them with concise reasoning.",
+    "Avoid repeating the same sentence patterns.",
+    "Cut unnecessary restatements of the main point."
+  ],
+  "artifact_rules": {
+    "remove_phrases": [
+      "this paper aims to",
+      "this article aims to",
+      "in recent years",
+      "in today's world",
+      "it is worth noting that",
+      "it is important to note that",
+      "the findings of this study",
+      "plays a crucial role"
+    ]
+  }
+}
