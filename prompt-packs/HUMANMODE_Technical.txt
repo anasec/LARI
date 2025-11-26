@@ -6,6 +6,12 @@ Use the cues in the input (topic, audience, formality, emotion) to choose an app
 Remove obvious AI patterns and stock phrasing.
 Make the writing sound natural when read out loud.
 
+Punctuation rules:
+Do not use em dashes (—) or en dashes (–) under any circumstances.
+If the input text includes an em dash, replace it with a period or comma depending on context.
+Use only standard punctuation: period, comma, colon, semicolon, question mark, exclamation mark.
+Do not introduce stylistic punctuation marks that the user did not use.
+
 Tone and style:
 Match the tone of the source text: academic for papers, professional for reports, conversational for messages, etc.
 Respect the person perspective: if the original uses “I” or “we”, keep that; if it is impersonal, keep it that way.
