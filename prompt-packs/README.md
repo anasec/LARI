@@ -1,4 +1,5 @@
-# LARI — HumanMode Prompt Packs
+# LARI — LLM Artifact Removal Initiative
+## HumanMode Prompt Packs
 Copy-and-paste ready prompts for anyone who wants more human output from AI, without installing LARI.
 
 These prompts:
