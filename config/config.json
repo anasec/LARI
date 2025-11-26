@@ -1,5 +1,5 @@
 {
-  "default_engine": "openai",
+  "default_engine": "ollama",
   "default_model": "gpt-4.1-mini",
   "profiles_path": "./config/profiles",
   "default_profile": "linkedin",
@@ -10,5 +10,6 @@
   "ollama": {
     "base_url": "http://localhost:11434",
     "model": "llama3"
-  }
+  },
+  "anthropic_model": "claude-3-sonnet-20240229"
 }
