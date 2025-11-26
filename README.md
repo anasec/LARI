@@ -1,5 +1,5 @@
 # LARI — LLM Artifact Removal Initiative  
-### Humanizing AI-generated text through profile-driven rewriting
+### Profile-Based Rewriting for Natural, Human-Readable Text
 
 ![Project](https://img.shields.io/badge/Project-LARI-blueviolet)
 ![HumanMode](https://img.shields.io/badge/HumanMode-Profiles-green)
@@ -8,335 +8,236 @@
 
 ---
 
-## 🧩 Overview
+# Overview
 
-**LARI (LLM Artifact Removal Initiative)** is a lightweight, profile-driven rewriting tool that cleans AI-generated text and rewrites it through OpenAI, Anthropic, or Ollama.
+LARI rewrites text using profile-driven instructions that guide tone, rhythm, and clarity.  
+The goal is to produce writing that feels natural and readable, without the mechanical patterns common in AI-generated content.
 
-It supports:
-
-- HumanMode rewriting profiles  
-- A simple “dry-run” artifact scrubber  
-- CLI-driven text, file, or stdin input  
-
-LARI is designed for **clarity** and **authenticity**, not impersonation or bypassing safety features.
+LARI runs locally with **Ollama by default**, requiring no API keys or cloud access.  
+OpenAI and Anthropic engines remain available as optional backends.
 
 ---
 
-## 🚀 Features
+# Installation
 
-### ✔ HumanMode Profiles
+LARI can be installed with or without a virtual environment.
 
-Profiles are stored as JSON under:
+### Clone the project
+```
+git clone https://github.com/anasec/LARI
+cd LARI
+```
 
+### (Optional) Create a virtual environment
+This is recommended for clean dependency isolation.
+```
+python -m venv venv
+```
+
+Activate it:
+
+macOS/Linux:
+```
+source venv/bin/activate
+```
+
+Windows:
+```
+venv\Scripts\activate.bat
+```
+
+### Install dependencies
+```
+pip install -r requirements.txt
+```
+
+---
+
+# Default Local Setup (Ollama)
+
+LARI uses Ollama as its default engine for offline rewriting.
+
+### Install Ollama  
+Download from:  
+https://ollama.com/download
+
+### Pull a model (recommended)
+```
+ollama pull llama3.1
+```
+
+### Start the service
+```
+ollama serve
+```
+
+LARI will automatically use the Ollama engine unless another engine is explicitly selected.
+
+---
+
+# Basic Usage
+
+### Rewrite text directly
+```
+python lari.py run "Rewrite this text to feel more natural."
+```
+
+### Use a specific profile
+```
+python lari.py run "text here" --profile=linkedin
+```
+
+### Use file input
+```
+python lari.py run --file=input.txt --profile=technical
+```
+
+### Pipe from stdin
+```
+cat draft.txt | python lari.py run --profile=casual
+```
+
+If no text or file is provided, LARI listens for stdin.
+
+---
+
+# HumanMode Profiles
+
+Profiles define rewrite behavior and live in:
 ```
 config/profiles/
 ```
 
-Each profile contains:
-
-```json
-{
-  "system": "System-level instructions for the model.",
-  "user": "User-level rewrite instructions before the actual text."
-}
+Each profile specifies system-level and user-level instructions that shape the result.  
+To use a profile:
+```
+python lari.py run "text" --profile=academic
 ```
 
-You select a profile with the `--profile` option:
+To create a new profile, add a JSON file in the profiles directory.
 
-```bash
-python lari.py run "Rewrite this text." --profile=linkedin
+---
+
+# Engines
+
+LARI supports four engines:
+
+| Engine | Backend | Offline | Notes |
+|--------|---------|---------|-------|
+| ollama | Local Ollama server | Yes | Default and recommended |
+| openai | OpenAI Chat Completions | No | Requires API key |
+| anthropic | Claude Messages API | No | Requires API key |
+| dry-run | No model | Yes | Performs basic artifact cleanup |
+
+Select an engine with:
 ```
-
-If no profile is provided, the default is:
-
-```bash
---profile=linkedin
+python lari.py run "text" --engine=ollama
 ```
 
 ---
 
-### ✔ Supported Engines
+# Optional Cloud Engines (OpenAI and Anthropic)
 
-LARI supports exactly **four** engines, controlled by `--engine`:
+These engines require API keys. They are entirely optional.
 
-| Engine      | Backend                     | Offline? | Notes                                                  |
-|-------------|-----------------------------|----------|--------------------------------------------------------|
-| `openai`    | OpenAI Chat Completions     | No       | Model name from `config["default_model"]`             |
-| `anthropic` | Claude Messages API         | No       | Model is currently fixed to `claude-3-sonnet-20240229` |
-| `ollama`    | Local Ollama instance       | Yes      | Uses `config["ollama"]["base_url"]` and `["model"]`   |
-| `dry-run`   | No model (regex-style scrub)| Yes      | Applies simple string replacements only               |
-
-If `--engine` is omitted, LARI uses:
-
-```json
-"default_engine": "openai"
+### macOS/Linux
+```
+export OPENAI_API_KEY="yourkey"
+export ANTHROPIC_API_KEY="yourkey"
 ```
 
-(from `config/config.json`)
+### Windows (PowerShell)
+```
+setx OPENAI_API_KEY "yourkey"
+setx ANTHROPIC_API_KEY "yourkey"
+```
 
-Examples:
-
-```bash
-# OpenAI
-python lari.py run "input text" --profile=technical --engine=openai
-
-# Anthropic (Claude 3 Sonnet)
-python lari.py run "input text" --profile=linkedin --engine=anthropic
-
-# Ollama (local model)
-python lari.py run "input text" --profile=casual --engine=ollama
-
-# Dry-run scrub only
-python lari.py run "as an AI, in conclusion— leveraging this…" --engine=dry-run
+Once set, you can run:
+```
+python lari.py run "text" --engine=openai
+python lari.py run "text" --engine=anthropic
 ```
 
 ---
 
-### ✔ Dry-run Artifact Scrubber
+# Dry-Run Scrubber
 
-When you choose `--engine=dry-run`, LARI does **not** call any model.  
-Instead, it applies a simple set of replacements:
-
-- Replace `—` and `–` with `-`
-- Remove `"in conclusion"`
-- Remove `"as an AI"`
-- Replace `"leveraging"` → `"using"`
-- Replace `"dive deeper"` → `"look into"`
-- Remove `"furthermore"`
+The dry-run engine performs simple artifact cleanup without calling any model.
 
 Example:
-
-```bash
-python lari.py run "as an AI, I think we should leverage this— in conclusion." --engine=dry-run
 ```
+python lari.py run "as an AI, I think we should leverage this" --engine=dry-run
+```
+
+This mode removes common patterns and placeholders while preserving the original structure.
 
 ---
 
-### ✔ Input Options
+# Configuration
 
-The `run` command supports three ways to feed text:
-
-1. **Positional argument**
-
-   ```bash
-   python lari.py run "Rewrite this text to sound more human." --profile=linkedin
-   ```
-
-2. **File input**
-
-   ```bash
-   python lari.py run --file=notes.txt --profile=academic
-   ```
-
-3. **STDIN (pipe)**  
-   If the `text` argument is omitted and `--file` is not set, LARI reads from stdin:
-
-   ```bash
-   cat draft.txt | python lari.py run --profile=technical
-   ```
-
-The function signature in `lari.py`:
-
-```python
-@app.command()
-def run(
-    text: str = typer.Argument(
-        None,
-        help="Text to rewrite. Leave blank to read from STDIN."
-    ),
-    profile: str = typer.Option("linkedin", help="Profile to use."),
-    engine: str = typer.Option(
-        None,
-        help="Engine: openai | anthropic | ollama | dry-run"
-    ),
-    file: str = typer.Option(None, help="Input file path"),
-):
-    ...
+LARI reads from:
+```
+config/config.json
 ```
 
-There is **no** `--out`, `--dir`, `--clipboard`, or `--pipe` flag implemented in `lari.py`.
-
-
-Notes:
-
-- `config/config.json` is the **actual** config file used by the code.  
-- `config/config.example.json` is a template you can copy/modify.  
-- `prompt-packs/` and `prompts/` are **for humans**, not consumed by `lari.py` directly.
-
----
-
-## ⚙️ Configuration
-
-LARI loads:
-
-```python
-with open("config/config.json", "r", encoding="utf-8") as f:
-    config = json.load(f)
-```
-
-A minimal working `config/config.json` might look like:
-
+A typical configuration:
 ```json
 {
   "profiles_path": "config/profiles",
-
   "openai_api_key_env": "OPENAI_API_KEY",
   "anthropic_api_key_env": "ANTHROPIC_API_KEY",
-
-  "default_engine": "openai",
+  "default_engine": "ollama",
   "default_model": "gpt-4o-mini",
-
   "temperature": 0.4,
   "max_tokens": 4096,
-
   "ollama": {
     "base_url": "http://localhost:11434",
-    "model": "llama3"
+    "model": "llama3.1"
   }
 }
 ```
 
-Set your API keys via environment variables:
+---
 
-```bash
-export OPENAI_API_KEY="your_key_here"
-export ANTHROPIC_API_KEY="your_key_here"
-```
+# Prompt Packs
 
-The Anthropic engine currently uses a fixed model:
+The `prompt-packs/` folder provides ready-to-use prompt files for users who prefer using an LLM interface instead of the CLI.  
 
-```python
-model="claude-3-sonnet-20240229"
-```
+Each pack contains a complete, copy-paste prompt designed to reproduce a HumanMode style inside tools like ChatGPT, Claude, or Gemini.
 
-If you want a different Claude model, you edit `lari.py`.
+Usage:
+1. Open any `.txt` file in the folder  
+2. Copy the entire contents  
+3. Paste into the LLM of your choice  
+4. Provide your draft text when requested  
+
+This makes LARI accessible to non-technical users without installation.
 
 ---
 
-## 🧠 Profiles (HumanMode)
+# Development Roadmap
 
-Each JSON profile in `config/profiles/` defines how LARI rewrites text:
+Planned improvements include:
 
-- System-level instructions (`system`)
-- User-level instructions (`user`)
-
-Example usage:
-
-```bash
-python lari.py run --file=blog.txt --profile=technical --engine=openai
-python lari.py run "Make this sound less robotic." --profile=casual --engine=ollama
-```
-
-To add a new profile:
-
-1. Create `config/profiles/myprofile.json`
-2. Define `"system"` and `"user"` fields
-3. Run:
-
-   ```bash
-   python lari.py run --file=input.txt --profile=myprofile
-   ```
+• Output file support  
+• Batch directory processing  
+• Clipboard integration  
+• Extended dry-run cleaning  
+• Additional HumanMode profiles  
+• GUI and editor extensions  
 
 ---
 
-## 📦 Prompt Packs (for non-technical users)
+# Contributing
 
-The **`prompt-packs/` folder** is for people who **don’t want to run the CLI at all**.
-
-It contains ready-made prompt files:
-
-- `HUMANMODE_Academic.txt`
-- `HUMANMODE_Casual.txt`
-- `HUMANMODE_LinkedIn.txt`
-- `HUMANMODE_Master.txt`
-- `HUMANMODE_Technical.txt`
-
-Each file:
-
-- Explains how to use a HumanMode style  
-- Includes a long-form, copy-pasteable prompt  
-- Works directly in ChatGPT, Claude, Gemini, or any other LLM UI  
-
-**How to use (no coding required):**
-
-1. Open any `HUMANMODE_*.txt` file
-2. Copy the entire contents
-3. Paste it into your chatbot of choice (ChatGPT, Claude, etc.)
-4. Paste or upload your draft text when the model asks
-
-This gives non-technical teammates access to LARI’s HumanMode concepts without touching Python or config files.
+Contributions are welcome.  
+You can add profiles, refine documentation, extend engines, or improve prompt packs.  
+See `CONTRIBUTING.md` for guidelines.
 
 ---
 
-## 🛠 Installation
+# License
 
-From the repo root:
+LARI is released under the MIT License.  
+See the LICENSE file for full terms.
 
-```bash
-git clone https://github.com/anasec/LARI.git
-cd LARI
-pip install -r requirements.txt
-```
-
-Make sure `config/config.json` exists (you can copy `config/config.example.json` and modify it).
-
----
-
-## 🔒 Safety Notes
-
-LARI is meant to:
-
-- Reduce robotic phrasing  
-- Remove obvious AI “tells”  
-- Improve readability and tone  
-
-LARI does **not**:
-
-- Impersonate specific people  
-- Bypass safety systems  
-- Guarantee undetectability  
-- Strip forensic or watermark signals  
-
-It is a writing-quality tool, not an evasion tool.
-
----
-
-## 📅 Roadmap (code-level)
-
-Planned / logical next features:
-
-- [ ] Optional output file support (`--out`)
-- [ ] Directory batch mode (`--dir`)
-- [ ] Clipboard mode
-- [ ] Stronger dry-run artifact cleaner
-- [ ] More built-in profiles and prompt packs
-
----
-
-## 🤝 Contributing
-
-You can contribute by:
-
-- Adding new profiles under `config/profiles/`  
-- Extending engine support  
-- Improving documentation  
-- Expanding prompt-packs for different audiences  
-
-See `CONTRIBUTING.md` for guidelines. Pull requests are welcome.
-
----
-
-## 📄 License
-
-This project is licensed under the **MIT License**.  
-See the `LICENSE` file for full details.
-
----
-
-## 🧭 Philosophy
-
-LARI exists for people who like the speed of AI, but not the way AI usually sounds. 
-LLMs aren't going anywhere, and the amount of AI text flooding the world is only going to get worse. This project aims to keep us a little bit more human.
-
-Stay human.  
-Happy writing.
