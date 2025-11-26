@@ -17,9 +17,7 @@ from rich.console import Console
 
 console = Console()
 
-# ---------------------------------------------------------
 # Spinner
-# ---------------------------------------------------------
 
 
 class Spinner:
@@ -55,9 +53,8 @@ class Spinner:
         sys.stdout.flush()
 
 
-# ---------------------------------------------------------
+
 # Config helpers
-# ---------------------------------------------------------
 
 
 def load_config() -> dict:
@@ -151,9 +148,7 @@ def build_prompts(profile: dict) -> Tuple[str, str]:
     return system_prompt, user_prefix
 
 
-# ---------------------------------------------------------
 # Engines
-# ---------------------------------------------------------
 
 
 def rewrite_with_openai(text: str, profile: dict, config: dict) -> str:
@@ -297,9 +292,7 @@ def dry_run_scrub(text: str) -> str:
     return cleaned.strip()
 
 
-# ---------------------------------------------------------
 # Output post-processing
-# ---------------------------------------------------------
 
 
 def postprocess_output(text: str) -> str:
@@ -358,9 +351,7 @@ def postprocess_output(text: str) -> str:
     return result.strip()
 
 
-# ---------------------------------------------------------
 # Main rewrite dispatcher
-# ---------------------------------------------------------
 
 
 def rewrite(text: str, engine: str, profile: dict, config: dict) -> str:
@@ -383,9 +374,7 @@ def rewrite(text: str, engine: str, profile: dict, config: dict) -> str:
     return postprocess_output(result)
 
 
-# ---------------------------------------------------------
 # CLI (single-command)
-# ---------------------------------------------------------
 
 
 def main(
