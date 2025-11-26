@@ -1,18 +1,59 @@
 #!/usr/bin/env python3
 import json
 import os
+import re
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
+
+import itertools
+import threading
+import time
 
 import requests
 import typer
 from rich import print
 from rich.console import Console
 
-app = typer.Typer(help="LARI — LLM Artifact Removal Initiative (v2.0)")
-
 console = Console()
+
+# ---------------------------------------------------------
+# Spinner (so users don't think LARI is frozen)
+# ---------------------------------------------------------
+
+
+class Spinner:
+    def __init__(self, message: str = "Generating", interval: float = 0.12):
+        self.message = message
+        self.interval = interval
+        self._running = False
+        self._thread: Optional[threading.Thread] = None
+
+    def start(self):
+        if self._running:
+            return
+        self._running = True
+        self._thread = threading.Thread(target=self._spin, daemon=True)
+        self._thread.start()
+
+    def _spin(self):
+        frames = itertools.cycle(["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
+        while self._running:
+            frame = next(frames)
+            sys.stdout.write(f"\r{self.message} {frame}")
+            sys.stdout.flush()
+            time.sleep(self.interval)
+
+    def stop(self):
+        if not self._running:
+            return
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=1.0)
+        # Clear the spinner line
+        sys.stdout.write("\r" + " " * 80 + "\r")
+        sys.stdout.flush()
+
 
 # ---------------------------------------------------------
 # Config helpers
@@ -55,6 +96,61 @@ def load_profile(profile_name: str, config: dict) -> dict:
         raise typer.Exit(code=1)
 
 
+def build_prompts(profile: dict) -> Tuple[str, str]:
+    """
+    Normalize profile structure so JSON files that only have
+    name/description/style_instructions/artifact_rules still work.
+
+    Returns: (system_prompt, user_prefix)
+    """
+
+    # If explicit prompts exist, just use them.
+    if "system" in profile and "user" in profile:
+        return profile["system"], profile["user"]
+
+    name = profile.get("name", "HumanMode profile")
+    desc = profile.get("description", "")
+    style_instructions = profile.get("style_instructions", [])
+    artifact_rules = profile.get("artifact_rules", {})
+    remove_phrases = artifact_rules.get("remove_phrases", [])
+
+    system_parts = [
+        f"You are a rewriting assistant applying the '{name}' style.",
+        "Your job is to rewrite text so it sounds human, natural, and authentic.",
+        "Preserve the original meaning and technical accuracy.",
+        "Do NOT talk about yourself, what you are doing, or how you rewrote the text.",
+        "Do NOT introduce the rewrite (no 'here is a reworked version', "
+        "'here is your rewritten text', or similar).",
+        "Do NOT use bullet lists or markdown-style '-' lines unless the original "
+        "text was already formatted as a list.",
+        "Do NOT use dashes or hyphens as fake punctuation between clauses "
+        "(no ' - ' or '--' between words).",
+        "Prefer commas and periods instead of any kind of dash when breaking up thoughts.",
+    ]
+    if desc:
+        system_parts.append(desc)
+
+    if style_instructions:
+        system_parts.append("Follow these style guidelines:")
+        for s in style_instructions:
+            system_parts.append(f"- {s}")
+
+    if remove_phrases:
+        system_parts.append("Avoid or remove these phrases when possible:")
+        for p in remove_phrases:
+            system_parts.append(f"- {p}")
+
+    system_prompt = "\n".join(system_parts)
+
+    user_prefix = (
+        "Rewrite the following text according to the style guidelines above.\n"
+        "Return ONLY the rewritten text, with no preface, no explanation, "
+        "and no lines like 'Here is the revised version'.\n\n"
+    )
+
+    return system_prompt, user_prefix
+
+
 # ---------------------------------------------------------
 # Engines
 # ---------------------------------------------------------
@@ -78,16 +174,18 @@ def rewrite_with_openai(text: str, profile: dict, config: dict) -> str:
     temperature = config.get("temperature", 0.4)
     max_tokens = config.get("max_tokens", 4096)
 
+    system_prompt, user_prefix = build_prompts(profile)
+
     try:
         response = client.chat.completions.create(
             model=model,
             temperature=temperature,
             max_tokens=max_tokens,
             messages=[
-                {"role": "system", "content": profile["system"]},
+                {"role": "system", "content": system_prompt},
                 {
                     "role": "user",
-                    "content": profile["user"] + "\n\n" + text,
+                    "content": user_prefix + text,
                 },
             ],
         )
@@ -116,14 +214,16 @@ def rewrite_with_anthropic(text: str, profile: dict, config: dict) -> str:
     temperature = config.get("temperature", 0.4)
     max_tokens = config.get("max_tokens", 4096)
 
+    system_prompt, user_prefix = build_prompts(profile)
+
     try:
         response = client.messages.create(
             model=model,
             max_tokens=max_tokens,
             temperature=temperature,
-            system=profile["system"],
+            system=system_prompt,
             messages=[
-                {"role": "user", "content": profile["user"] + "\n\n" + text}
+                {"role": "user", "content": user_prefix + text}
             ],
         )
     except Exception as e:
@@ -131,7 +231,9 @@ def rewrite_with_anthropic(text: str, profile: dict, config: dict) -> str:
         raise typer.Exit(code=1)
 
     # anthropic response.content is a list of blocks
-    return "".join(block.text for block in response.content if hasattr(block, "text")).strip()
+    return "".join(
+        block.text for block in response.content if hasattr(block, "text")
+    ).strip()
 
 
 def rewrite_with_ollama(text: str, profile: dict, config: dict) -> str:
@@ -141,15 +243,17 @@ def rewrite_with_ollama(text: str, profile: dict, config: dict) -> str:
 
     url = f"{base_url.rstrip('/')}/api/generate"
 
+    system_prompt, user_prefix = build_prompts(profile)
+
     payload = {
         "model": model,
-        "prompt": profile["system"] + "\n\n" + profile["user"] + "\n\n" + text,
+        "prompt": system_prompt + "\n\n" + user_prefix + text,
         "temperature": config.get("temperature", 0.4),
         "stream": False,  # important: get a single JSON response
     }
 
     try:
-        resp = requests.post(url, json=payload, timeout=120)
+        resp = requests.post(url, json=payload, timeout=300)
     except Exception as e:
         console.print(f"[red]Failed to reach Ollama at {base_url}:[/red] {e}")
         raise typer.Exit(code=1)
@@ -172,8 +276,6 @@ def dry_run_scrub(text: str) -> str:
     # normalize dashes
     cleaned = cleaned.replace("—", "-").replace("–", "-")
 
-    # lower-cased copy for phrase stripping
-    # but we remove from original via simple replace to avoid over-mangling
     to_strip = [
         "in conclusion",
         "as an ai",
@@ -196,19 +298,80 @@ def dry_run_scrub(text: str) -> str:
 
 
 # ---------------------------------------------------------
+# Output post-processing
+# ---------------------------------------------------------
+
+
+def postprocess_output(text: str) -> str:
+    """
+    Strip common AI-ish wrappers and clean dash-y punctuation.
+    """
+    lines = [line.rstrip() for line in text.splitlines()]
+
+    # Drop leading empty lines
+    while lines and not lines[0].strip():
+        lines.pop(0)
+
+    # Strip typical intro lines
+    if lines:
+        first = lines[0].strip().lower()
+        intro_starts = (
+            "here's a reworked version",
+            "here is a reworked version",
+            "here's the revised version",
+            "here is the revised version",
+            "here's a revised version",
+            "here is a revised version",
+            "here's your rewritten text",
+            "here is your rewritten text",
+            "rewritten version:",
+            "revised version:",
+        )
+        if any(first.startswith(p) for p in intro_starts):
+            lines = lines[1:]
+
+    # Strip "I'm ..." meta line if it's clearly about being an assistant / ai
+    if lines:
+        first = lines[0].strip().lower()
+        if first.startswith("i'm ") or first.startswith("i am "):
+            if "assistant" in first or "language model" in first:
+                lines = lines[1:]
+
+    # If the whole thing turned into bullet-y output, collapse it
+    if any(line.lstrip().startswith("- ") for line in lines):
+        bullet_lines = [
+            l.lstrip()[2:] if l.lstrip().startswith("- ") else l for l in lines
+        ]
+        result = " ".join(bullet_lines)
+        result = re.sub(r"\s+", " ", result).strip()
+        # dash cleanup
+        result = re.sub(r"(\w)\s*[-–—]{1,2}\s+(\w)", r"\1, \2", result)
+        return result.strip()
+
+    # Normal join
+    result = "\n".join(lines).strip()
+
+    # --- Dash cleanup: turn " - " / " -- " between words into commas ---
+    # This keeps real minus signs and hyphenated words intact.
+    result = re.sub(r"(\w)\s*[-–—]{1,2}\s+(\w)", r"\1, \2", result)
+
+    return result.strip()
+
+
+# ---------------------------------------------------------
 # Main rewrite dispatcher
 # ---------------------------------------------------------
 
 
 def rewrite(text: str, engine: str, profile: dict, config: dict) -> str:
     if engine == "dry-run":
-        return dry_run_scrub(text)
+        result = dry_run_scrub(text)
     elif engine == "openai":
-        return rewrite_with_openai(text, profile, config)
+        result = rewrite_with_openai(text, profile, config)
     elif engine == "anthropic":
-        return rewrite_with_anthropic(text, profile, config)
+        result = rewrite_with_anthropic(text, profile, config)
     elif engine == "ollama":
-        return rewrite_with_ollama(text, profile, config)
+        result = rewrite_with_ollama(text, profile, config)
     else:
         console.print(
             f"[red]Unknown engine:[/red] {engine}\n"
@@ -217,14 +380,15 @@ def rewrite(text: str, engine: str, profile: dict, config: dict) -> str:
         )
         raise typer.Exit(code=1)
 
+    return postprocess_output(result)
+
 
 # ---------------------------------------------------------
-# CLI Command
+# CLI (single-command)
 # ---------------------------------------------------------
 
 
-@app.command()
-def run(
+def main(
     text: Optional[str] = typer.Option(
         None,
         "--text",
@@ -257,12 +421,13 @@ def run(
         None,
         "--engine",
         "-e",
-        help="Engine: openai | anthropic | ollama | dry-run. Defaults to config.default_engine.",
+        help="Engine: openai | anthropic | ollama | dry-run. "
+             "Defaults to config.default_engine.",
     ),
 ):
     """
     LARI rewrite engine.
-    Provide --text, --file, or pipe content via stdin.
+    Use --text, --file, or pipe content via stdin.
     """
     config = load_config()
     engine_to_use = engine or config.get("default_engine", "openai")
@@ -290,11 +455,17 @@ def run(
         else:
             console.print(
                 "[red]No input provided.[/red]\n"
-                "Use [cyan]--text[/cyan], [cyan]--file[/cyan], or pipe data via stdin."
+                "Use [cyan]--text[/cyan], [cyan]--file[/cyan], "
+                "or pipe data via stdin."
             )
             raise typer.Exit(code=1)
 
-    result = rewrite(input_text, engine_to_use, profile_data, config)
+    spinner = Spinner("Generating")
+    spinner.start()
+    try:
+        result = rewrite(input_text, engine_to_use, profile_data, config)
+    finally:
+        spinner.stop()
 
     if out:
         try:
@@ -309,4 +480,4 @@ def run(
 
 
 if __name__ == "__main__":
-    app()
+    typer.run(main)
