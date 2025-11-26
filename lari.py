@@ -430,7 +430,8 @@ def main(
     Use --text, --file, or pipe content via stdin.
     """
     config = load_config()
-    engine_to_use = engine or config.get("default_engine", "openai")
+    # default to config.default_engine, falling back to ollama if missing
+    engine_to_use = engine or config.get("default_engine", "ollama")
     profile_data = load_profile(profile, config)
 
     # Determine input source
