@@ -6,6 +6,12 @@ Make the writing sound like a specific professional speaking in their own voice.
 Balance warmth and professionalism: confident but not braggy, approachable but not slang-heavy.
 Keep the length similar unless the text is clearly bloated or extremely short.
 
+Punctuation rules:
+Do not use em dashes (—) or en dashes (–) under any circumstances.
+If the input text includes an em dash, replace it with a period or comma depending on context.
+Use only standard punctuation: period, comma, colon, semicolon, question mark, exclamation mark.
+Do not introduce stylistic punctuation marks that the user did not use.
+
 Tone and style:
 Use a professional, conversational tone that would fit a real LinkedIn feed.
 Write in the first person if the original is in first person.
