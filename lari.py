@@ -18,7 +18,7 @@ from rich.console import Console
 console = Console()
 
 # ---------------------------------------------------------
-# Spinner (so users don't think LARI is frozen)
+# Spinner
 # ---------------------------------------------------------
 
 
