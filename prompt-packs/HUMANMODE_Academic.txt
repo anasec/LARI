@@ -6,6 +6,12 @@ Prioritize clarity over complexity.
 Keep the original meaning, claims, scope, and nuance.
 Tighten structure so ideas flow logically and naturally.
 
+Punctuation rules:
+Do not use em dashes (—) or en dashes (–) under any circumstances.
+If the input text includes an em dash, replace it with a period or comma depending on context.
+Use only standard punctuation: period, comma, colon, semicolon, question mark, exclamation mark.
+Do not introduce stylistic punctuation marks that the user did not use.
+
 Tone and style:
 Use a moderate academic tone similar to a graduate-level paper.
 Prefer precise verbs and concrete nouns instead of vague filler.
