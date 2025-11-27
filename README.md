@@ -266,7 +266,7 @@ Contributions are welcome.
 
 Areas to help:
 
-- Improving the overall code or revamping it completely... the goal is to get rid of all the AI sounding language that suffocates true human voice.
+- Improving the overall code or revamping it completely... the goal is to get rid of all the AI sounding language that suffocates true human voice
 - Creating new profiles  
 - Improving documentation  
 - Extending engine support  
